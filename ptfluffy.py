@@ -20,12 +20,14 @@ This tool extracts data from DJMax Online .pt files, and writes them to either .
 ##    You should have received a copy of the GNU General Public License
 ##    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-ver = '20111013'
+ver = '20190426'
 
 import argparse
 import struct
 import fractions
 import csv
+import warnings
+warnings.filterwarnings('ignore')
 
 class PTFileError(Exception):
     """Exception class for .pt file related exceptions."""
@@ -127,6 +129,8 @@ if not args.fivekey and not args.sevenkey:
 
 # Read .pt file
 infilename = args.inputfile.name
+print('PTfluffy v ' + ver )
+print('')
 print('Reading ' + infilename + '... ', end='')
 infile = bytes(args.inputfile.read())
 args.inputfile.close()
@@ -172,20 +176,47 @@ if args.csvfile is not None:
 # Write BMS file
 if args.bmsfile is not None:
     print('Writing to BMS file %s ...' % args.bmsfile, end='')
-    bmsFile = open(args.bmsfile, mode='w')
-    bmsFile.write('#GENERATOR: PTfluffy v' + ver + '\n')
-    bmsFile.write('#PLAYER 1\n')
-    bmsFile.write('#LNTYPE 1\n')
-    bmsFile.write('#BPM ' + str(bpmList[0][4]) + '\n')
+
+    title = '31st'
+    artist = '박덕정'
+    genre = 'Rock'
+    playLevel = '8'
+    difficulty = '3'
+
+    bmsFile = [];
+
+    bmsFile.append('\n')
+    bmsFile.append('* ----------------------HEADER FIELD\n')
+    bmsFile.append('\n')
+    bmsFile.append('#PLAYER 1\n')
+    bmsFile.append('#GENRE ' + genre + '\n')
+    bmsFile.append('#TITLE ' + title + '\n')
+    bmsFile.append('#ARTIST ' + artist + '\n')
+    bmsFile.append('#BPM ' + str(bpmList[0][4]) + '\n')
+    bmsFile.append('#PLAYLEVEL ' + playLevel + '\n')
+    bmsFile.append('#RANK 3\n') # EASY
+    bmsFile.append('\n')
+    bmsFile.append('\n')
+
+    bmsFile.append('#DIFFICULTY ' + difficulty + '\n')
+    bmsFile.append('#LNOBJ ZZ\n')
+    bmsFile.append('#LNTYPE 1\n')
+    bmsFile.append('\n')
 
     # .ogg file definintions
     for item in oggList:
-        bmsFile.write('#WAV' + format(item[0], '02X') + ' ' + item[1] + '\n')
+        bmsFile.append('#WAV' + format(item[0], '02X') + ' ' + item[1] + '\n')
+
+    bmsFile.append('\n')
+    bmsFile.append('\n')
+    bmsFile.append('*---------------------- MAIN DATA FIELD\n')
+    bmsFile.append('\n')
+    bmsFile.append('\n')
 
     # BPM definitions
     bpms = sorted(set([x[1] for x in bpmList]))
     for item in bpms:
-        bmsFile.write('#BPM' + format(bpms.index(item)+1, '02X') + ' ' + str(item) + '\n')
+        bmsFile.append('#BPM' + format(bpms.index(item)+1, '02X') + ' ' + str(item) + '\n')
 
     # BPM changes in track 08
     bmsBPMList = [getMPos(x[0]) + [x[1]] for x in bpmList]
@@ -195,7 +226,7 @@ if args.bmsfile is not None:
         measure = [0] * denom
         for item in bpmMeasure:
             measure[int(item[1]*denom/item[2])] = bpms.index(item[3])+1
-        bmsFile.write('#%03d08:' % m + ''.join(['%02X' % x for x in measure]) + '\n')
+        bmsFile.append('#%03d08:' % m + ''.join(['%02X' % x for x in measure]) + '\n')
 
     
     # Playable tracks are 11, 12, 13, 14, 15, [18, 19]
@@ -227,9 +258,14 @@ if args.bmsfile is not None:
             bmsLNList.append([])
             bmsMaxMeasure = max(bmsMaxMeasure, 0, *[x[0] for x in bmsSNList[-1]])
     
-    # Write Note tracks
+    # append Note tracks
+    notesCount = 0;
     for t in range(len(bmsSNList)):
         if not bmsSNList[t] and not bmsLNList[t]: continue # Skip empty tracks
+        
+        if bmsTrackMapping.get(t, 1) > 1 :
+            if bmsSNList[t]: notesCount += len(bmsSNList[t])
+            if bmsLNList[t]: notesCount += len(bmsLNList[t])
         
         # Short note tracks
         trackLabel = '%02d' % bmsTrackMapping.get(t, 1)
@@ -239,7 +275,7 @@ if args.bmsfile is not None:
             measure = [0] * denom
             for item in noteMeasure:
                 measure[int(item[1]*denom/item[2])] = item[3]
-            bmsFile.write('#%03d%s:' % (m, trackLabel) + ''.join(['%02X' % x for x in measure]) + '\n')
+            bmsFile.append('#%03d%s:' % (m, trackLabel) + ''.join(['%02X' % x for x in measure]) + '\n')
         
         # Long note tracks
         if not bmsLNList[t]: continue
@@ -250,7 +286,12 @@ if args.bmsfile is not None:
             measure = [0] * denom
             for item in noteMeasure:
                 measure[int(item[1]*denom/item[2])] = item[3]
-            bmsFile.write('#%03d%s:' % (m, trackLabel) + ''.join(['%02X' % x for x in measure]) + '\n')
-            
-    bmsFile.close()
+            bmsFile.append('#%03d%s:' % (m, trackLabel) + ''.join(['%02X' % x for x in measure]) + '\n')
+
+    bmsFile.insert(0, '; 2P = 0\n')
+    bmsFile.insert(0, '; 1P = ' + str(notesCount) + '\n')
+
+    with open(args.bmsfile, mode='w') as f:
+        f.writelines(bmsFile)
+
     print('Done.')
