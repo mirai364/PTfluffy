@@ -177,7 +177,7 @@ if args.csvfile is not None:
 if args.bmsfile is not None:
     print('Writing to BMS file %s ...' % args.bmsfile, end='')
 
-    title = '31st'
+    title = '1st'
     artist = '박덕정'
     genre = 'Rock'
     playLevel = '8'
@@ -291,7 +291,7 @@ if args.bmsfile is not None:
     bmsFile.insert(0, '; 2P = 0\n')
     bmsFile.insert(0, '; 1P = ' + str(notesCount) + '\n')
 
-    with open(args.bmsfile, mode='w') as f:
+    with open(args.bmsfile, mode='w', encoding='utf-8') as f:
         f.writelines(bmsFile)
 
     print('Done.')
