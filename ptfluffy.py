@@ -181,17 +181,10 @@ def getDbData(tag, key, levelIndex):
 # Parsing command line arguments with argparse
 aparser = argparse.ArgumentParser(description='Extract data from DJMax Online *.pt files. Version ' + ver)
 aparser.add_argument('inputfile', help='Filename of .pt file to extract from.', type=argparse.FileType('rb'))
-aparser.add_argument('-o', help='Filename of .bms/bme file to output to. Existing files will be overwritten without warning.', \
-                     dest='bmsfile')
 aparser.add_argument('-c', help='Filename of .csv file to output to. Includes all useful data extracted from .pt file. ' + \
                      'Existing files will be overwritten without warning.', dest='csvfile')
 akeys=aparser.add_mutually_exclusive_group()
-akeys.add_argument('-5', help='Treat .pt file as 5-key chart.', action='store_true', dest='fivekey')
-akeys.add_argument('-7', help='Treat .pt file as 7-key chart. This is the default option.', action='store_true', dest='sevenkey')
-
 args=aparser.parse_args()
-if not args.fivekey and not args.sevenkey:
-    args.sevenkey = True
 
 # Read .pt file
 infilename = args.inputfile.name
