@@ -21,12 +21,15 @@ This tool extracts data from DJMax Online .pt files, and writes them to either .
 ##    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 ver = '20190426'
+debug = False
 
 import argparse
 import struct
 import fractions
 import csv
+import os
 import warnings
+import sqlite3
 warnings.filterwarnings('ignore')
 
 class PTFileError(Exception):
@@ -109,6 +112,69 @@ def parsePTFile(bPTfile):
             
     return (oggList, bpmList, trackList)
     
+def getDifficulty(difficultName):
+    difficultName = difficultName.lower()
+  
+    difficulty = 3
+    if difficultName == 'ez': difficulty = 1
+    if difficultName == 'nm': difficulty = 2
+    if difficultName == 'hd': difficulty = 3
+    if difficultName == 'mx': difficulty = 4
+    if difficultName == 'sc': difficulty = 5
+    if difficultName == 'easy': difficulty = 1
+    if difficultName == 'normal': difficulty = 2
+    if difficultName == 'hard': difficulty = 3
+
+    return difficulty
+ 
+def getFormalDifficultyName(difficulty):
+    formalDifficultyName = 'HARD'
+
+    if difficulty == 1: formalDifficultyName = 'EASY'
+    if difficulty == 2: formalDifficultyName = 'NORMAL'
+    if difficulty == 3: formalDifficultyName = 'HARD'
+    if difficulty == 4: formalDifficultyName = 'MAXIMUM'
+    if difficulty == 5: formalDifficultyName = 'SUPER-CRAZY'
+
+    return formalDifficultyName
+ 
+def getLevelIndex(difficultName):
+    difficultName = difficultName.lower()
+  
+    levelIndex = 5
+    if difficultName == 'ez': levelIndex = 3
+    if difficultName == 'nm': levelIndex = 4
+    if difficultName == 'hd': levelIndex = 5
+    if difficultName == 'mx': levelIndex = 6
+    if difficultName == 'sc': levelIndex = 7
+    if difficultName == 'easy': levelIndex = 3
+    if difficultName == 'normal': levelIndex = 4
+    if difficultName == 'hard': levelIndex = 5
+
+    return levelIndex
+
+def getDbData(tag, key, levelIndex):
+    # init
+    dbpath = 'songinfo.db'
+    idIndex = 0
+    titleIndex = 2
+    genreIndex = 3
+    artistIndex = 5
+    
+    #connect
+    connection = sqlite3.connect(dbpath)
+    cursor = connection.cursor()
+
+    # SELECT
+    cursor.execute('SELECT * FROM songinfo WHERE tag = ?', (tag,))
+    songinfo = cursor.fetchone()
+
+    if songinfo[artistIndex] is None : artistIndex = 7
+
+    cursor.execute('SELECT * FROM levelinfo WHERE songinfoId = ? and key = ?', (songinfo[idIndex],key))
+    levelinfo = cursor.fetchone()
+    return (songinfo[titleIndex], songinfo[genreIndex], songinfo[artistIndex], levelinfo[levelIndex])
+
 
 
 
@@ -129,20 +195,26 @@ if not args.fivekey and not args.sevenkey:
 
 # Read .pt file
 infilename = args.inputfile.name
-print('PTfluffy v ' + ver )
-print('')
+if debug:
+    print('PTfluffy v ' + ver )
+    print('')
+
 print('Reading ' + infilename + '... ', end='')
+
 infile = bytes(args.inputfile.read())
 args.inputfile.close()
 print('Done.')
 
-print('Parsing... ', end='')
+if debug:
+    print('Parsing... ', end='')
 oggList, bpmList, trackList = parsePTFile(infile)
-print('Done.')
+if debug:
+    print('Done.')
 
 # Write CSV file
 if args.csvfile is not None:
-    print('Writing to CSV file ' + args.csvfile + ' ... ', end='')
+    if debug:
+        print('Writing to CSV file ' + args.csvfile + ' ... ', end='')
     csvFile = open(args.csvfile, mode='w', newline='')
     csvWriter = csv.writer(open(args.csvfile, mode='w', newline=''), dialect='excel')
     csvWriter.writerow(['Data extracted from:',infilename])
@@ -171,19 +243,58 @@ if args.csvfile is not None:
 
     del csvWriter
     csvFile.close()
-    print('Done.')
+    if debug:
+        print('Done.')
 
 # Write BMS file
 if args.bmsfile is not None:
-    print('Writing to BMS file %s ...' % args.bmsfile, end='')
+    bmsFileName = args.bmsfile
 
-    title = '1st'
-    artist = '박덕정'
-    genre = 'Rock'
-    playLevel = '8'
-    difficulty = '3'
+    baseName = os.path.basename(infilename)
+    root_ext_pair = os.path.splitext(baseName)
+    params = root_ext_pair[0].split('_') 
+    
+    index = 1
+    tag = params[0]
+    difficultName = 'hd'
+    key = ''
+    if (len(params) > 2):
+        difficultName = params[index]
+        index += 1
+        # Exception handling(elasticstar_remix)
+        if (difficultName == 'remix'):
+            tag = tag + '_remix'
+            key = params[index][0:1]
+            difficultName = 'hd'
+            index += 1
 
-    bmsFile = [];
+        if (len(params) > index):
+            key = params[index][0:1]
+            if key != '5' and key != '7':
+                key = params[index - 1][0:1]
+                difficultName = params[index]
+            
+    else:
+        key = params[index][0:1]
+        difficultName = params[index][2:4]
+
+    if debug:
+        print([tag, difficultName, key])
+    difficulty = getDifficulty(difficultName)
+    title, genre, artist, playLevel  = getDbData(tag, key, getLevelIndex(difficultName))
+    formalDifficultyName = getFormalDifficultyName(difficulty)
+    if debug:
+        print('DB data [Title "%s", Genre "%s", Artist "%s", Difficulty %d[%s], PlayLevel %d]' % (title, genre, artist, difficulty, formalDifficultyName, playLevel))
+
+    os.makedirs('chart\\' + tag, exist_ok=True)
+    bmsFileName = 'chart\\' + tag + '\\@' + title + ' [1P' + key + 'K '+ formalDifficultyName + '].bms'
+
+    if (key == '7'): args.sevenkey = True
+    if (key == '5'): args.sevenkey = False
+ 
+    if debug:
+        print('Writing to BMS file %s ...' % bmsFileName, end='')
+    bmsFile = []
 
     bmsFile.append('\n')
     bmsFile.append('* ----------------------HEADER FIELD\n')
@@ -193,19 +304,19 @@ if args.bmsfile is not None:
     bmsFile.append('#TITLE ' + title + '\n')
     bmsFile.append('#ARTIST ' + artist + '\n')
     bmsFile.append('#BPM ' + str(bpmList[0][4]) + '\n')
-    bmsFile.append('#PLAYLEVEL ' + playLevel + '\n')
+    bmsFile.append('#PLAYLEVEL ' + str(playLevel) + '\n')
     bmsFile.append('#RANK 3\n') # EASY
     bmsFile.append('\n')
     bmsFile.append('\n')
 
-    bmsFile.append('#DIFFICULTY ' + difficulty + '\n')
+    bmsFile.append('#DIFFICULTY ' + str(difficulty) + '\n')
     bmsFile.append('#LNOBJ ZZ\n')
     bmsFile.append('#LNTYPE 1\n')
     bmsFile.append('\n')
 
     # .ogg file definintions
     for item in oggList:
-        bmsFile.append('#WAV' + format(item[0], '02X') + ' ' + item[1] + '\n')
+        bmsFile.append('#WAV' + format(item[0], '02X') + ' SND\\' + item[1] + '\n')
 
     bmsFile.append('\n')
     bmsFile.append('\n')
@@ -291,7 +402,8 @@ if args.bmsfile is not None:
     bmsFile.insert(0, '; 2P = 0\n')
     bmsFile.insert(0, '; 1P = ' + str(notesCount) + '\n')
 
-    with open(args.bmsfile, mode='w', encoding='utf-8') as f:
+    with open(bmsFileName, mode='w', encoding='utf-8') as f:
         f.writelines(bmsFile)
-
-    print('Done.')
+    
+    if debug:
+        print('Done.')
