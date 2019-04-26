@@ -247,163 +247,160 @@ if args.csvfile is not None:
         print('Done.')
 
 # Write BMS file
-if args.bmsfile is not None:
-    bmsFileName = args.bmsfile
+baseName = os.path.basename(infilename)
+root_ext_pair = os.path.splitext(baseName)
+params = root_ext_pair[0].split('_') 
 
-    baseName = os.path.basename(infilename)
-    root_ext_pair = os.path.splitext(baseName)
-    params = root_ext_pair[0].split('_') 
-    
-    index = 1
-    tag = params[0]
-    difficultName = 'hd'
-    key = ''
-    if (len(params) > 2):
-        difficultName = params[index]
-        index += 1
-        # Exception handling(elasticstar_remix)
-        if (difficultName == 'remix'):
-            tag = tag + '_remix'
-            key = params[index][0:1]
-            difficultName = 'hd'
-            index += 1
-
-        if (len(params) > index):
-            key = params[index][0:1]
-            if key != '5' and key != '7':
-                key = params[index - 1][0:1]
-                difficultName = params[index]
-            
-    else:
+index = 1
+tag = params[0]
+difficultName = 'hd'
+key = ''
+if (len(params) > 2):
+    difficultName = params[index]
+    index += 1
+    # Exception handling(elasticstar_remix)
+    if (difficultName == 'remix'):
+        tag = tag + '_remix'
         key = params[index][0:1]
-        difficultName = params[index][2:4]
+        difficultName = 'hd'
+        index += 1
 
-    if debug:
-        print([tag, difficultName, key])
-    difficulty = getDifficulty(difficultName)
-    title, genre, artist, playLevel  = getDbData(tag, key, getLevelIndex(difficultName))
-    formalDifficultyName = getFormalDifficultyName(difficulty)
-    if debug:
-        print('DB data [Title "%s", Genre "%s", Artist "%s", Difficulty %d[%s], PlayLevel %d]' % (title, genre, artist, difficulty, formalDifficultyName, playLevel))
+    if (len(params) > index):
+        key = params[index][0:1]
+        if key != '5' and key != '7':
+            key = params[index - 1][0:1]
+            difficultName = params[index]
+        
+else:
+    key = params[index][0:1]
+    difficultName = params[index][2:4]
 
-    os.makedirs('chart\\' + tag, exist_ok=True)
-    bmsFileName = 'chart\\' + tag + '\\@' + title + ' [1P' + key + 'K '+ formalDifficultyName + '].bms'
+if debug:
+    print([tag, difficultName, key])
+difficulty = getDifficulty(difficultName)
+title, genre, artist, playLevel  = getDbData(tag, key, getLevelIndex(difficultName))
+formalDifficultyName = getFormalDifficultyName(difficulty)
+if debug:
+    print('DB data [Title "%s", Genre "%s", Artist "%s", Difficulty %d[%s], PlayLevel %d]' % (title, genre, artist, difficulty, formalDifficultyName, playLevel))
 
-    if (key == '7'): args.sevenkey = True
-    if (key == '5'): args.sevenkey = False
- 
-    if debug:
-        print('Writing to BMS file %s ...' % bmsFileName, end='')
-    bmsFile = []
+os.makedirs('chart\\' + tag, exist_ok=True)
+bmsFileName = 'chart\\' + tag + '\\@' + title + ' [1P' + key + 'K '+ formalDifficultyName + '].bms'
 
-    bmsFile.append('\n')
-    bmsFile.append('* ----------------------HEADER FIELD\n')
-    bmsFile.append('\n')
-    bmsFile.append('#PLAYER 1\n')
-    bmsFile.append('#GENRE ' + genre + '\n')
-    bmsFile.append('#TITLE ' + title + '\n')
-    bmsFile.append('#ARTIST ' + artist + '\n')
-    bmsFile.append('#BPM ' + str(bpmList[0][4]) + '\n')
-    bmsFile.append('#PLAYLEVEL ' + str(playLevel) + '\n')
-    bmsFile.append('#RANK 3\n') # EASY
-    bmsFile.append('\n')
-    bmsFile.append('\n')
+if (key == '7'): args.sevenkey = True
+if (key == '5'): args.sevenkey = False
 
-    bmsFile.append('#DIFFICULTY ' + str(difficulty) + '\n')
-    bmsFile.append('#LNOBJ ZZ\n')
-    bmsFile.append('#LNTYPE 1\n')
-    bmsFile.append('\n')
+if debug:
+    print('Writing to BMS file %s ...' % bmsFileName, end='')
+bmsFile = []
 
-    # .ogg file definintions
-    for item in oggList:
-        bmsFile.append('#WAV' + format(item[0], '02X') + ' SND\\' + item[1] + '\n')
+bmsFile.append('\n')
+bmsFile.append('* ----------------------HEADER FIELD\n')
+bmsFile.append('\n')
+bmsFile.append('#PLAYER 1\n')
+bmsFile.append('#GENRE ' + genre + '\n')
+bmsFile.append('#TITLE ' + title + '\n')
+bmsFile.append('#ARTIST ' + artist + '\n')
+bmsFile.append('#BPM ' + str(bpmList[0][4]) + '\n')
+bmsFile.append('#PLAYLEVEL ' + str(playLevel) + '\n')
+bmsFile.append('#RANK 3\n') # EASY
+bmsFile.append('\n')
+bmsFile.append('\n')
 
-    bmsFile.append('\n')
-    bmsFile.append('\n')
-    bmsFile.append('*---------------------- MAIN DATA FIELD\n')
-    bmsFile.append('\n')
-    bmsFile.append('\n')
+bmsFile.append('#DIFFICULTY ' + str(difficulty) + '\n')
+bmsFile.append('#LNOBJ ZZ\n')
+bmsFile.append('#LNTYPE 1\n')
+bmsFile.append('\n')
 
-    # BPM definitions
-    bpms = sorted(set([x[1] for x in bpmList]))
-    for item in bpms:
-        bmsFile.append('#BPM' + format(bpms.index(item)+1, '02X') + ' ' + str(item) + '\n')
+# .ogg file definintions
+for item in oggList:
+    bmsFile.append('#WAV' + format(item[0], '02X') + ' SND\\' + item[1] + '\n')
 
-    # BPM changes in track 08
-    bmsBPMList = [getMPos(x[0]) + [x[1]] for x in bpmList]
-    for m in sorted(set([x[0] for x in bmsBPMList])):
-        bpmMeasure = [x for x in bmsBPMList if x[0] == m]
-        denom = lcm(*[x[2] for x in bpmMeasure])
-        measure = [0] * denom
-        for item in bpmMeasure:
-            measure[int(item[1]*denom/item[2])] = bpms.index(item[3])+1
-        bmsFile.append('#%03d08:' % m + ''.join(['%02X' % x for x in measure]) + '\n')
+bmsFile.append('\n')
+bmsFile.append('\n')
+bmsFile.append('*---------------------- MAIN DATA FIELD\n')
+bmsFile.append('\n')
+bmsFile.append('\n')
 
+# BPM definitions
+bpms = sorted(set([x[1] for x in bpmList]))
+for item in bpms:
+    bmsFile.append('#BPM' + format(bpms.index(item)+1, '02X') + ' ' + str(item) + '\n')
+
+# BPM changes in track 08
+bmsBPMList = [getMPos(x[0]) + [x[1]] for x in bpmList]
+for m in sorted(set([x[0] for x in bmsBPMList])):
+    bpmMeasure = [x for x in bmsBPMList if x[0] == m]
+    denom = lcm(*[x[2] for x in bpmMeasure])
+    measure = [0] * denom
+    for item in bpmMeasure:
+        measure[int(item[1]*denom/item[2])] = bpms.index(item[3])+1
+    bmsFile.append('#%03d08:' % m + ''.join(['%02X' % x for x in measure]) + '\n')
+
+
+# Playable tracks are 11, 12, 13, 14, 15, [18, 19]
+# BGM tracks are all 01
+if args.sevenkey:
+    bmsTrackMapping = {2:12, 3:13, 4:14, 5:15, 6:18, 9:11, 10:19}
+    bmsLNTrackMapping = {2:52, 3:53, 4:54, 5:55, 6:58, 9:51, 10:59}
+else:
+    bmsTrackMapping = {2:11, 3:12, 4:13, 5:14, 6:15}
+    bmsLNTrackMapping = {2:51, 3:52, 4:53, 5:54, 6:55}
     
-    # Playable tracks are 11, 12, 13, 14, 15, [18, 19]
-    # BGM tracks are all 01
-    if args.sevenkey:
-        bmsTrackMapping = {2:12, 3:13, 4:14, 5:15, 6:18, 9:11, 10:19}
-        bmsLNTrackMapping = {2:52, 3:53, 4:54, 5:55, 6:58, 9:51, 10:59}
+# Create separate short & long notes list for playable tracks
+bmsSNList = []
+LNList = []
+bmsLNList = []
+bmsMaxMeasure = 0
+for t in range(len(trackList)):
+    if t in bmsTrackMapping:
+        bmsSNList.append([getMPos(x[0]) + [x[1]] for x in trackList[t][1] if x[4] <= 6])
+        LNList = [[x[0], x[1], x[4]] for x in trackList[t][1] if x[4] > 6]
+        bmsLNList.append([])
+        for x in LNList:
+            bmsLNList[-1].append(getMPos(x[0]) + [x[1]])
+            bmsLNList[-1].append(getMPos(x[0] + x[2]) + [x[1]])
+        bmsMaxMeasure = max(bmsMaxMeasure, 0, *[x[0] for x in bmsSNList[-1]])
+        bmsMaxMeasure = max(bmsMaxMeasure, 0, *[x[0] for x in bmsLNList[-1]])
     else:
-        bmsTrackMapping = {2:11, 3:12, 4:13, 5:14, 6:15}
-        bmsLNTrackMapping = {2:51, 3:52, 4:53, 5:54, 6:55}
-        
-    # Create separate short & long notes list for playable tracks
-    bmsSNList = []
-    LNList = []
-    bmsLNList = []
-    bmsMaxMeasure = 0
-    for t in range(len(trackList)):
-        if t in bmsTrackMapping:
-            bmsSNList.append([getMPos(x[0]) + [x[1]] for x in trackList[t][1] if x[4] <= 6])
-            LNList = [[x[0], x[1], x[4]] for x in trackList[t][1] if x[4] > 6]
-            bmsLNList.append([])
-            for x in LNList:
-                bmsLNList[-1].append(getMPos(x[0]) + [x[1]])
-                bmsLNList[-1].append(getMPos(x[0] + x[2]) + [x[1]])
-            bmsMaxMeasure = max(bmsMaxMeasure, 0, *[x[0] for x in bmsSNList[-1]])
-            bmsMaxMeasure = max(bmsMaxMeasure, 0, *[x[0] for x in bmsLNList[-1]])
-        else:
-            bmsSNList.append([getMPos(x[0]) + [x[1]] for x in trackList[t][1]])
-            bmsLNList.append([])
-            bmsMaxMeasure = max(bmsMaxMeasure, 0, *[x[0] for x in bmsSNList[-1]])
-    
-    # append Note tracks
-    notesCount = 0;
-    for t in range(len(bmsSNList)):
-        if not bmsSNList[t] and not bmsLNList[t]: continue # Skip empty tracks
-        
-        if bmsTrackMapping.get(t, 1) > 1 :
-            if bmsSNList[t]: notesCount += len(bmsSNList[t])
-            if bmsLNList[t]: notesCount += len(bmsLNList[t])
-        
-        # Short note tracks
-        trackLabel = '%02d' % bmsTrackMapping.get(t, 1)
-        for m in range(bmsMaxMeasure+1):
-            noteMeasure = [x for x in bmsSNList[t] if x[0] == m]
-            denom = lcm(*[x[2] for x in noteMeasure])
-            measure = [0] * denom
-            for item in noteMeasure:
-                measure[int(item[1]*denom/item[2])] = item[3]
-            bmsFile.append('#%03d%s:' % (m, trackLabel) + ''.join(['%02X' % x for x in measure]) + '\n')
-        
-        # Long note tracks
-        if not bmsLNList[t]: continue
-        trackLabel = '%02d' % bmsLNTrackMapping.get(t, 1)
-        for m in range(bmsMaxMeasure+1):
-            noteMeasure = [x for x in bmsLNList[t] if x[0] == m]
-            denom = lcm(*[x[2] for x in noteMeasure])
-            measure = [0] * denom
-            for item in noteMeasure:
-                measure[int(item[1]*denom/item[2])] = item[3]
-            bmsFile.append('#%03d%s:' % (m, trackLabel) + ''.join(['%02X' % x for x in measure]) + '\n')
+        bmsSNList.append([getMPos(x[0]) + [x[1]] for x in trackList[t][1]])
+        bmsLNList.append([])
+        bmsMaxMeasure = max(bmsMaxMeasure, 0, *[x[0] for x in bmsSNList[-1]])
 
-    bmsFile.insert(0, '; 2P = 0\n')
-    bmsFile.insert(0, '; 1P = ' + str(notesCount) + '\n')
-
-    with open(bmsFileName, mode='w', encoding='utf-8') as f:
-        f.writelines(bmsFile)
+# append Note tracks
+notesCount = 0;
+for t in range(len(bmsSNList)):
+    if not bmsSNList[t] and not bmsLNList[t]: continue # Skip empty tracks
     
-    if debug:
-        print('Done.')
+    if bmsTrackMapping.get(t, 1) > 1 :
+        if bmsSNList[t]: notesCount += len(bmsSNList[t])
+        if bmsLNList[t]: notesCount += len(bmsLNList[t])
+    
+    # Short note tracks
+    trackLabel = '%02d' % bmsTrackMapping.get(t, 1)
+    for m in range(bmsMaxMeasure+1):
+        noteMeasure = [x for x in bmsSNList[t] if x[0] == m]
+        denom = lcm(*[x[2] for x in noteMeasure])
+        measure = [0] * denom
+        for item in noteMeasure:
+            measure[int(item[1]*denom/item[2])] = item[3]
+        bmsFile.append('#%03d%s:' % (m, trackLabel) + ''.join(['%02X' % x for x in measure]) + '\n')
+    
+    # Long note tracks
+    if not bmsLNList[t]: continue
+    trackLabel = '%02d' % bmsLNTrackMapping.get(t, 1)
+    for m in range(bmsMaxMeasure+1):
+        noteMeasure = [x for x in bmsLNList[t] if x[0] == m]
+        denom = lcm(*[x[2] for x in noteMeasure])
+        measure = [0] * denom
+        for item in noteMeasure:
+            measure[int(item[1]*denom/item[2])] = item[3]
+        bmsFile.append('#%03d%s:' % (m, trackLabel) + ''.join(['%02X' % x for x in measure]) + '\n')
+
+bmsFile.insert(0, '; 2P = 0\n')
+bmsFile.insert(0, '; 1P = ' + str(notesCount) + '\n')
+
+with open(bmsFileName, mode='w', encoding='utf-8') as f:
+    f.writelines(bmsFile)
+
+if debug:
+    print('Done.')
